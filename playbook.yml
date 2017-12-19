@@ -67,7 +67,7 @@
     - name: Copying the template file from the server
       fetch:
         src: /root/image_builder/inv_files/variables.yml.j2
-        dest: {{ playbook_dir }}/variables.yml.j2
+        dest: "{{ playbook_dir }}/variables.yml.j2"
         flat: yes
         fail_on_missing: yes
 

@@ -1,2 +1,3 @@
 # This is a test
-Nothing to see here.
+
+Set up the inventory to point to the image building server.
