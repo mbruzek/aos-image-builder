@@ -1,0 +1,110 @@
+---
+- name: A collection of tasks to build Atomic OpenShift virtual images
+  hosts: image-server
+  vars:
+    # The hostname of the OpenShift mirror server.
+    aos_hostname: "{{ lookup('env', 'AOS_HOSTNAME') }}"
+    # The full url of the AOS repository.
+    aos_repo: "https://{{ aos_hostname }}/enterprise/all/{{ ocp_major_minor }}/latest/RH7-RHAOS-{{ ocp_major_minor }}/x86_64/os/"
+    # Is this an atomic image?
+    atomic: "{{ lookup('env', 'ATOMIC') }}"
+    # The base image server hostname.
+    base_image_hostname: "{{ lookup('env', 'BASE_IMAGE_URL')|urlsplit('hostname') }}"
+    # The url to the the virtual image to use as the base.
+    base_image_url: "{{ lookup('env', 'BASE_IMAGE_URL') }}"
+    # The storage driver to configure for Docker.
+    docker_storage_driver: "{{ lookup('env', 'DOCKER_STORAGE_DRIVER') }}"
+    # The server to download the rhel image from.
+    image_hostname: "{{ lookup('env', 'IMAGE_HOSTNAME') }}"
+    # The instance tag: rhel or atomic
+    instance_tag: "{{ lookup('env', 'INSTANCE_TAG') }}"
+    # The major and minor version of OpenShift Container Platform to build.
+    ocp_major_minor: "{{ lookup('env', 'OCP_MAJOR_MINOR') }}"
+    # The full url to the Packages directory to get the latest puddle version.
+    package_repo: "http://{{ base_image_hostname }}/rcm-guest/puddles/RHAOS/AtomicOpenShift/{{ ocp_major_minor }}/latest/x86_64/os/Packages"
+    # The pbench server to configure the image with.
+    pbench_hostname: "{{ lookup('env', 'PBENCH_HOSTNAME')}}"
+    # Target directory appears unused.
+    target_directory: "{{ lookup('env', 'TARGET_DIRECTORY') }}"
+    # The directory on the image server to perform this work.
+    work_directory: "{{ ansible_user_dir }}/aos-image-builder"
+  tasks:
+    # Find the Packages web page and return the listing of packages (content).
+    - name: Get the latest AtomicOpenShift packages to find the version
+      uri:
+        url: "{{ package_repo }}"
+        method: GET
+        follow_redirects: all
+        return_content: yes
+      register: uri_result
+
+    # Create a regular expression to match the full version (3.9.0-0.9.0).
+    - name: Create a regular expression to match the full version
+      set_fact:
+        full_version_regex: "atomic-openshift-(\\d+.\\d+.\\d+-.+?).git.*?rpm"
+
+    # The full version (3.9.0-0.9.0) is in the name of the atomic-openshift RPM.
+    - name: Setting the the full version
+      set_fact:
+        full_version: "{{ uri_result.content|regex_findall(full_version_regex)|first }}"
+
+    # Create the regular expression to match the Semantic version (3.9.0).
+    - name: Creating the regular expression to match the Semantic version
+      set_fact:
+        semantic_version_regex: "atomic-openshift-(\\d+.\\d+.\\d+).*?.git.*?rpm"
+
+    # The Semantic version (3.9.0) is in the name of the atomic-openshift RPM.
+    - name: Setting the Semantic version
+      set_fact:
+        semantic_version_regex: "{{ uri_result['content']|regex_findall(semantic_version_regex)|first }}"
+
+    # Create the path to the extra variables file.
+    - name: Setting the path to the extra variables file
+      set_fact:
+        extra_variables: "{{ work_directory }}/variables.yml"
+
+    # Copy the template from the server.
+    - name: Copying the template file from the server
+      fetch:
+        src: /root/image_builder/inv_files/variables.yml.j2
+        dest: {{ playbook_dir }}/variables.yml.j2
+        flat: yes
+        fail_on_missing: yes
+
+    # Render the Jinja2 variable template to the image server.
+    - name: Rendering the extra variables file to the image server
+      template:
+        src: variables.yml.j2
+        dest: "{{ extra_variables }}"
+
+    # Create the path to the inventory file.
+    - name: Setting the path to the extra variables file
+      set_fact:
+        inventory: "{{ work_directory }}/inventory"
+
+    # Create the inventory file for the image-server.
+    - name: Creating a localhost inventory file for the image server
+      copy:
+        content: "localhost ansible_connection=local"
+        dest: "{{ inventory }}"
+
+    # TODO: Clone the svt repository.
+    # This repo should be cloned each time, to ensure the directory exists and has the latest code.
+    # The previous script simply uses the directory as is and may have code not in the repo.
+
+    # Create the path the svt playbooks directory.
+    - name: Setting the path to the image setup log file
+      set_fact:
+        svt_playbooks: "{{ ansible_user_dir }}/ansible_user_dir }}/svt/image_provisioner/playbooks"
+
+    # Create the path to the log file.
+    - name: Setting the path to the image setup log file
+      set_fact:
+        setup_image_log: "{{ work_directory }}/setup_image.log"
+
+    # Run the playbook to setup the image.
+    - name: Running the playbook to set up the image
+      shell: "ansible_playbook -vv -i {{ inventory }} --extra-vars={{ extra_variables }} {{ svt_playbooks }}/setup-image.yaml 2>&1 >> {{ setup_image_log }}"
+      args:
+        # Use bash to get the posix style redirects.
+        executable: /bin/bash
