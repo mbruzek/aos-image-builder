@@ -101,7 +101,7 @@
     # Create the path the svt playbooks directory.
     - name: Setting the path to the image setup log file
       set_fact:
-        svt_playbooks: "{{ ansible_user_dir }}/ansible_user_dir }}/svt/image_provisioner/playbooks"
+        svt_playbooks: "{{ ansible_user_dir }}/svt/image_provisioner/playbooks"
 
     # Create the path to the log file.
     - name: Setting the path to the image setup log file
@@ -110,7 +110,7 @@
 
     # Run the playbook to setup the image.
     - name: Running the playbook to set up the image
-      shell: "ansible_playbook -vv -i {{ inventory }} --extra-vars={{ extra_variables }} {{ svt_playbooks }}/setup-image.yaml 2>&1 >> {{ setup_image_log }}"
+      shell: "ansible-playbook -vv -i {{ inventory }} --extra-vars={{ extra_variables }} {{ svt_playbooks }}/setup-image.yaml 2>&1 >> {{ setup_image_log }}"
       args:
         # Use bash to get the posix style redirects.
         executable: /bin/bash
