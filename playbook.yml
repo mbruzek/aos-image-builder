@@ -29,6 +29,12 @@
     # The directory on the image server to perform this work.
     work_directory: "{{ ansible_user_dir }}/aos-image-builder"
   tasks:
+    # Create the directory for this work.
+    - name: Creating the work directory
+      file:
+        path: "{{ work_directory }}"
+        state: directory
+
     # Find the Packages web page and return the listing of packages (content).
     - name: Get the latest AtomicOpenShift packages to find the version
       uri:
